@@ -23,16 +23,18 @@ async function getUser() {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await context.params; // ✅ cần await vì params là Promise
     const user = await getUser();
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const order = await prisma.order.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         items: {
           include: {
@@ -43,12 +45,18 @@ export async function GET(
     });
 
     if (!order) {
-      return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Không tìm thấy đơn hàng" },
+        { status: 404 }
+      );
     }
 
-    // Chỉ cho phép xem đơn của chính mình
+    // ✅ Chỉ cho phép xem đơn của chính mình
     if (order.userId !== user.id) {
-      return NextResponse.json({ error: "Không có quyền truy cập đơn hàng này" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Không có quyền truy cập đơn hàng này" },
+        { status: 403 }
+      );
     }
 
     return NextResponse.json(order);
@@ -67,10 +75,12 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await context.params; // ✅ sửa: params là Promise
     const user = await getUser();
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -79,23 +89,32 @@ export async function PATCH(
     const { status } = body;
 
     if (!status) {
-      return NextResponse.json({ error: "Thiếu trạng thái đơn hàng" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Thiếu trạng thái đơn hàng" },
+        { status: 400 }
+      );
     }
 
     const order = await prisma.order.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!order) {
-      return NextResponse.json({ error: "Không tìm thấy đơn hàng" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Không tìm thấy đơn hàng" },
+        { status: 404 }
+      );
     }
 
     if (order.userId !== user.id) {
-      return NextResponse.json({ error: "Không có quyền cập nhật đơn hàng này" }, { status: 403 });
+      return NextResponse.json(
+        { error: "Không có quyền cập nhật đơn hàng này" },
+        { status: 403 }
+      );
     }
 
     const updatedOrder = await prisma.order.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status,
         updatedAt: new Date(),

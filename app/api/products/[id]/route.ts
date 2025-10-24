@@ -17,18 +17,25 @@ async function verifyToken() {
 // ================================
 // GET: /api/products/[id]
 // ================================
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> } // ✅ sửa ở đây
+) {
+  const { id } = await context.params; // ✅ cần await
   const product = await prisma.product.findUnique({ where: { id } });
-  if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!product)
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(product);
 }
 
 // ================================
 // PUT: /api/products/[id]
 // ================================
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function PUT(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> } // ✅ sửa ở đây
+) {
+  const { id } = await context.params;
   await verifyToken();
 
   const formData = await req.formData();
@@ -65,8 +72,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 // ================================
 // DELETE: /api/products/[id]
 // ================================
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { id } = params;
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> } // ✅ sửa ở đây
+) {
+  const { id } = await context.params;
   await verifyToken();
 
   await prisma.product.delete({ where: { id } });
