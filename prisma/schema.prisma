@@ -1,0 +1,216 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User Models (Existing - giữ nguyên)
+// ============================================
+
+model User {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String?
+  posts Post[]
+}
+
+model Post {
+  id        Int     @id @default(autoincrement())
+  title     String
+  content   String?
+  published Boolean @default(false)
+  authorId  Int
+  author    User    @relation(fields: [authorId], references: [id])
+}
+
+// ============================================
+// E-Commerce Models (Enhanced)
+// ============================================
+
+// User for E-Commerce (authentication)
+model UserP {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  phone     String?
+  address   String?
+  city      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  orders    Order[]
+  carts     Cart[]
+  reviews   Review[]
+  
+  @@map("users_ecommerce")
+}
+
+// Product Model (Enhanced)
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  price       Float
+  imageUrl    String?
+  stock       Int      @default(0)
+  category    String?  // Áo thun, Áo khoác, Quần, Phụ kiện...
+  featured    Boolean  @default(false) // Sản phẩm nổi bật
+  onSale      Boolean  @default(false) // Đang giảm giá
+  salePrice   Float?   // Giá sale (nếu có)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+  reviews     Review[]
+  
+  @@map("products")
+}
+
+// Cart Model (Giỏ hàng)
+model Cart {
+  id        String   @id @default(uuid())
+  userId    String
+  user      UserP    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  items     CartItem[]
+  
+  @@unique([userId]) // Mỗi user chỉ có 1 giỏ hàng
+  @@map("carts")
+}
+
+// Cart Item (Sản phẩm trong giỏ hàng)
+model CartItem {
+  id        String   @id @default(uuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([cartId, productId]) // Mỗi sản phẩm chỉ xuất hiện 1 lần trong giỏ hàng
+  @@map("cart_items")
+}
+
+// Order Model (Đơn hàng)
+model Order {
+  id              String      @id @default(uuid())
+  userId          String
+  user            UserP       @relation(fields: [userId], references: [id])
+  
+  // Order Information
+  orderNumber     String      @unique @default(uuid())
+  status          OrderStatus @default(PENDING)
+  
+  // Shipping Information
+  shippingName    String
+  shippingEmail   String
+  shippingPhone   String
+  shippingAddress String
+  shippingCity    String
+  shippingNote    String?
+  
+  // Payment Information
+  paymentMethod   PaymentMethod @default(COD)
+  paymentStatus   PaymentStatus @default(UNPAID)
+  
+  // Price Information
+  subtotal        Float // Tổng tiền hàng
+  shippingFee     Float @default(0) // Phí vận chuyển
+  discount        Float @default(0) // Giảm giá
+  total           Float // Tổng thanh toán
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime? // Thời gian hoàn thành đơn
+  
+  // Relations
+  items           OrderItem[]
+  
+  @@map("orders")
+}
+
+// Order Item (Sản phẩm trong đơn hàng)
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  
+  // Product snapshot at time of order
+  productName  String
+  productPrice Float
+  productImage String?
+  
+  quantity  Int
+  subtotal  Float // quantity * productPrice
+  
+  createdAt DateTime @default(now())
+  
+  @@map("order_items")
+}
+
+// Review Model (Đánh giá sản phẩm)
+model Review {
+  id        String   @id @default(uuid())
+  userId    String
+  user      UserP    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  rating    Int      // 1-5 sao
+  comment   String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([userId, productId]) // Mỗi user chỉ review 1 lần mỗi sản phẩm
+  @@map("reviews")
+}
+
+// ============================================
+// Enums
+// ============================================
+
+enum OrderStatus {
+  PENDING     // Chờ xác nhận
+  CONFIRMED   // Đã xác nhận
+  PROCESSING  // Đang xử lý
+  SHIPPING    // Đang giao hàng
+  DELIVERED   // Đã giao hàng
+  CANCELLED   // Đã hủy
+  REFUNDED    // Đã hoàn tiền
+}
+
+enum PaymentMethod {
+  COD         // Thanh toán khi nhận hàng
+  BANK        // Chuyển khoản ngân hàng
+  MOMO        // Ví MoMo
+  VNPAY       // VNPay
+  ZALOPAY     // ZaloPay
+}
+
+enum PaymentStatus {
+  UNPAID      // Chưa thanh toán
+  PAID        // Đã thanh toán
+  REFUNDED    // Đã hoàn tiền
+  FAILED      // Thanh toán thất bại
+}
